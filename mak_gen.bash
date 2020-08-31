@@ -1,12 +1,5 @@
 #!/bin/bash
-# makefile generator
-
-# first scoop up all the source files
-SRC_FILES=$(ls *.cpp)
-
-EXEC_NAME="prog"
-C_FLAGS="-Wall"
-L_FLAGS=""
+# makefile generator, rhys trueman, circa july 2020
 
 # extracts included header files from a given file
 # arg is the file to read
@@ -21,7 +14,7 @@ find_included_headers(){
 #input filenames through STDIN
 #output new filenames through STDOUT
 change_extension(){
-	awk '{gsub("'$1'","'$2'",$0); printf "%s", $1}'	
+	awk '{gsub("'$1'","'$2'",$0); printf "%s", $0}'	
 }
 
 # for a given source file, find its dependencies, that is included header files without matching source files
@@ -51,7 +44,7 @@ write_rule(){
 	find_deps $1
 	echo $1
 	# write the compile command:
-	echo -e "\tg++ -c "$1
+	echo -e "\tg++ \$(C_FLAGS) -c "$1
 	echo
 }
 
@@ -61,19 +54,47 @@ write_makefile(){
 	echo EXEC_NAME=$EXEC_NAME
 	echo C_FLAGS=$C_FLAGS
 	echo L_FLAGS=$L_FLAGS
+	echo
 
+	#now write the main rule:
+	echo -n '$(EXEC_NAME): '
+	echo -n $SRC_FILES | change_extension ".cpp" ".o"
+	echo
+	echo -en "\tg++ "
+	echo -n $SRC_FILES | change_extension ".cpp" ".o"
+	echo ' -o $(EXEC_NAME) $(L_FLAGS)'
+	echo
+
+	#wite rule for each object/source
 	for FILE in $SRC_FILES
 	do
 		write_rule $FILE
 	done
+
+	#write a clean rule
+	echo "clean:"
+	echo -e "\trm *.o \$(EXEC_NAME)"
+
 }
 
-write_makefile
+# first scoop up all the source files
+SRC_FILES=$(ls *.cpp)
 
-if [ -f makefile ]; then
-
+#now if a makefile exists extract the old values from it
+#otherwise request from user
+if [ -f makefile ]
+then
+	EXEC_NAME=$(awk -F "=" '/EXEC_NAME=/ {print $2}' makefile)
+	C_FLAGS=$(awk -F "=" '/C_FLAGS=/ {print $2}' makefile)
+	L_FLAGS=$(awk -F "=" '/L_FLAGS=/ {print $2}' makefile)
 else
-
+	echo -n "executable name: "
+	read EXEC_NAME
+	echo -n "compile flags: "
+	read -e C_FLAGS
+	echo -n "linking flags: "
+	read -e L_FLAGS
 fi
 
-
+#write the makefile
+write_makefile > makefile
